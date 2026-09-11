@@ -1,0 +1,21 @@
+# Send only API sources and shared build configuration.
+**
+!global.json
+!Directory.Build.props
+!.editorconfig
+!src/
+!src/backend/
+!src/backend/Workhaven.Api/
+!src/backend/Workhaven.Api/**
+
+**/bin
+**/obj
+**/.env*
+**/secrets.json
+**/*.pfx
+**/*.p12
+**/*.pem
+**/*.key
+**/AGENTS.md
+**/Dockerfile
+**/Properties/launchSettings.json

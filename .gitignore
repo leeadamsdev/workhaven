@@ -1,0 +1,30 @@
+# Local agent instructions
+/AGENTS.md
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# .NET
+**/bin/
+**/obj/
+.vs/
+*.user
+*.suo
+
+# Node / frontend
+**/node_modules/
+**/dist/
+**/playwright-report/
+**/blob-report/
+**/test-results/
+**/e2e-artifacts/
+
+# Logs
+*.log
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
