@@ -1,4 +1,17 @@
 services:
+  frontend:
+    build:
+      context: .
+      dockerfile: src/frontend/Dockerfile
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-5173}:8080"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "--timeout=3", "http://127.0.0.1:8080/"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   api:
     build:
       context: .

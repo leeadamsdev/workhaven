@@ -31,7 +31,7 @@ dotnet_diagnostic.IDE0059.severity = warning
 [*.{csproj,props,targets,slnx}]
 indent_size = 2
 
-[*.{ts,tsx,js,jsx,json,jsonc,css,scss,html,yml,yaml}]
+[*.{ts,tsx,js,jsx,mjs,json,jsonc,css,scss,html,yml,yaml}]
 indent_size = 2
 
 [*.md]
