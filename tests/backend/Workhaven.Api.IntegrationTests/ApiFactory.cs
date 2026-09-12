@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 
@@ -5,7 +6,8 @@ namespace Workhaven.Api.IntegrationTests;
 
 internal static class ApiFactory
 {
-    public static WebApplicationFactory<Program> Create(Dictionary<string, string?>? overrides = null)
+    public static WebApplicationFactory<Program> Create(
+        Dictionary<string, string?>? overrides = null, string environment = "Development")
     {
         var settings = new Dictionary<string, string?>
         {
@@ -24,6 +26,7 @@ internal static class ApiFactory
         }
 
         return new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-            builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(settings)));
+            builder.UseEnvironment(environment)
+                .ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(settings)));
     }
 }

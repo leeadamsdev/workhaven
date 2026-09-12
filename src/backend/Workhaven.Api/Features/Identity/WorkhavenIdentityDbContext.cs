@@ -11,5 +11,6 @@ internal sealed class WorkhavenIdentityDbContext(DbContextOptions<WorkhavenIdent
     {
         base.OnModelCreating(builder);
         builder.HasDefaultSchema("identity");
+        builder.Entity<IdentityUser>().HasIndex(user => user.NormalizedEmail).IsUnique();
     }
 }

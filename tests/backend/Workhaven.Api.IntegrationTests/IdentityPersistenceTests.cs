@@ -1,10 +1,7 @@
 using System.Security.Claims;
-using System.Text;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using Workhaven.Api.Features.Identity;
@@ -24,7 +21,7 @@ public sealed class IdentityPersistenceTests : IAsyncLifetime
     {
         await _database.Container.StartAsync(TestContext.Current.CancellationToken);
         _factory = ApiFactory.Create(_database.Settings);
-        await ApplyMigrationsAsync();
+        await _database.ApplyMigrationsAsync(Factory.Services);
     }
 
     public async ValueTask DisposeAsync()
@@ -51,7 +48,7 @@ public sealed class IdentityPersistenceTests : IAsyncLifetime
             userId = user.Id;
         }
 
-        await ApplyMigrationsAsync();
+        await _database.ApplyMigrationsAsync(Factory.Services);
 
         await using var restartedFactory = ApiFactory.Create(_database.Settings);
         await using var restartedScope = restartedFactory.Services.CreateAsyncScope();
@@ -79,9 +76,9 @@ public sealed class IdentityPersistenceTests : IAsyncLifetime
     {
         await using var scope = Factory.Services.CreateAsyncScope();
         var users = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
-        Assert.True((await users.CreateAsync(new IdentityUser("member@example.test"))).Succeeded);
+        Assert.True((await users.CreateAsync(new IdentityUser("member@example.test") { Email = "member@example.test" })).Succeeded);
 
-        var duplicate = await users.CreateAsync(new IdentityUser("MEMBER@example.test"));
+        var duplicate = await users.CreateAsync(new IdentityUser("MEMBER@example.test") { Email = "other@example.test" });
         Assert.False(duplicate.Succeeded);
         Assert.Contains(duplicate.Errors, error => error.Code == "DuplicateUserName");
 
@@ -99,7 +96,7 @@ public sealed class IdentityPersistenceTests : IAsyncLifetime
     {
         await using var firstScope = Factory.Services.CreateAsyncScope();
         var firstManager = firstScope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
-        var firstUser = new IdentityUser("member@example.test");
+        var firstUser = new IdentityUser("member@example.test") { Email = "member@example.test" };
         Assert.True((await firstManager.CreateAsync(firstUser)).Succeeded);
 
         await using var secondScope = Factory.Services.CreateAsyncScope();
@@ -129,17 +126,5 @@ public sealed class IdentityPersistenceTests : IAsyncLifetime
         var exception = await Assert.ThrowsAsync<PostgresException>(() =>
             command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken));
         Assert.Equal(PostgresErrorCodes.InsufficientPrivilege, exception.SqlState);
-    }
-
-    private async Task ApplyMigrationsAsync()
-    {
-        await using var scope = Factory.Services.CreateAsyncScope();
-        var context = scope.ServiceProvider.GetRequiredService<WorkhavenIdentityDbContext>();
-        Assert.False(context.Database.HasPendingModelChanges());
-        var script = context.GetService<IMigrator>().GenerateScript(options: MigrationsSqlGenerationOptions.Idempotent);
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await _database.Container.CopyAsync(Encoding.UTF8.GetBytes(script), "/database/migrations.sql", ct: cancellationToken);
-        var result = await _database.Container.ExecAsync(["sh", "/database/migrate.sh"], cancellationToken);
-        Assert.True(result.ExitCode == 0, result.Stderr);
     }
 }

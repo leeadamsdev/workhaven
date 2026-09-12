@@ -1,6 +1,13 @@
 using System.Globalization;
+using System.Text;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using Testcontainers.PostgreSql;
+using Workhaven.Api.Features.Identity;
+using Xunit;
 
 namespace Workhaven.Api.IntegrationTests;
 
@@ -41,6 +48,18 @@ internal sealed class PostgreSqlDatabase : IAsyncDisposable
                 ["Database:Password"] = _appPassword
             };
         }
+    }
+
+    public async Task ApplyMigrationsAsync(IServiceProvider services)
+    {
+        await using var scope = services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<WorkhavenIdentityDbContext>();
+        Assert.False(context.Database.HasPendingModelChanges());
+        var script = context.GetService<IMigrator>().GenerateScript(options: MigrationsSqlGenerationOptions.Idempotent);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await Container.CopyAsync(Encoding.UTF8.GetBytes(script), "/database/migrations.sql", ct: cancellationToken);
+        var result = await Container.ExecAsync(["sh", "/database/migrate.sh"], cancellationToken);
+        Assert.True(result.ExitCode == 0, result.Stderr);
     }
 
     public ValueTask DisposeAsync() => Container.DisposeAsync();
