@@ -1,8 +1,13 @@
-# Send only API sources and shared build configuration.
+# Send only backend sources, database scripts, and shared build configuration.
 **
 !global.json
 !Directory.Build.props
 !.editorconfig
+!.config/
+!.config/dotnet-tools.json
+!development/
+!development/postgres/
+!development/postgres/*.sh
 !src/
 !src/backend/
 !src/backend/Workhaven.Api/

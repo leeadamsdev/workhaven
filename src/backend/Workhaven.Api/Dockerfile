@@ -9,6 +9,21 @@ COPY src/backend/Workhaven.Api/ src/backend/Workhaven.Api/
 RUN dotnet publish src/backend/Workhaven.Api/Workhaven.Api.csproj \
     --configuration Release --no-restore --output /app/publish -p:UseAppHost=false
 
+FROM build AS migration-script
+COPY .config/dotnet-tools.json .config/
+RUN dotnet tool restore
+# Generating SQL needs configuration, but never connects to a database.
+RUN dotnet ef migrations script --idempotent --no-build --configuration Release \
+    --project src/backend/Workhaven.Api --output /app/migrations.sql \
+    -- --Database:Host=localhost --Database:Name=workhaven \
+    --Database:Username=unused --Database:Password=unused
+
+FROM postgres:18.6-trixie AS migrations
+COPY --from=migration-script /app/migrations.sql /database/migrations.sql
+COPY development/postgres/init-app-user.sh development/postgres/migrate.sh /database/
+USER postgres
+ENTRYPOINT ["sh", "/database/migrate.sh"]
+
 FROM mcr.microsoft.com/dotnet/aspnet:10.0.12-noble@sha256:6a94333d37514e385650a3c81a55e5350b67253dbe136e9cf17e499c35606a8c AS runtime
 
 # Compose uses curl to probe the API's health endpoint.

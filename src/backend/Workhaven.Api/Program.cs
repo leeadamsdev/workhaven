@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Npgsql;
+using Workhaven.Api.Features.Identity;
 using Workhaven.Api.Infrastructure.Database;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -26,6 +29,11 @@ builder.Services.AddSingleton(serviceProvider =>
 
     return NpgsqlDataSource.Create(connectionString.ConnectionString);
 });
+
+builder.Services.AddDbContext<WorkhavenIdentityDbContext>((services, options) =>
+    options.UseNpgsql(services.GetRequiredService<NpgsqlDataSource>()));
+builder.Services.AddIdentityCore<IdentityUser>()
+    .AddEntityFrameworkStores<WorkhavenIdentityDbContext>();
 
 builder.Services.AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>("postgresql", timeout: TimeSpan.FromSeconds(5));

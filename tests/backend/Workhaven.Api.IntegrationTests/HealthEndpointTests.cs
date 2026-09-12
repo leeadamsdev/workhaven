@@ -1,12 +1,9 @@
 using System.Diagnostics;
-using System.Globalization;
 using System.Net;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Npgsql;
-using Testcontainers.PostgreSql;
 using Xunit;
 
 namespace Workhaven.Api.IntegrationTests;
@@ -16,7 +13,7 @@ public sealed class HealthEndpointTests
     [Fact]
     public async Task GetHealthReturnsOkWithHealthyStatus()
     {
-        await using var factory = CreateFactory();
+        await using var factory = ApiFactory.Create();
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
             AllowAutoRedirect = false
@@ -40,7 +37,7 @@ public sealed class HealthEndpointTests
     [InlineData("Password", "")]
     public async Task StartupRejectsInvalidDatabaseConfiguration(string property, string? value)
     {
-        await using var factory = CreateFactory(new Dictionary<string, string?>
+        await using var factory = ApiFactory.Create(new Dictionary<string, string?>
         {
             [$"Database:{property}"] = value
         });
@@ -54,32 +51,15 @@ public sealed class HealthEndpointTests
     public async Task ReadinessTracksDatabaseAvailabilityAndRejectsInvalidCredentials()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var appPassword = $"test;'\"\\={Guid.NewGuid():N}";
-        const string initScriptPath = "/docker-entrypoint-initdb.d/10-workhaven-app.sh";
-        var initScript = await File.ReadAllBytesAsync(
-            Path.Combine(AppContext.BaseDirectory, "Postgres", "init-app-user.sh"), cancellationToken);
-        await using var postgres = new PostgreSqlBuilder("postgres:18.6-trixie")
-            .WithDatabase("workhaven")
-            .WithUsername("postgres")
-            .WithEnvironment("POSTGRES_APP_PASSWORD", appPassword)
-            .WithEnvironment("POSTGRES_INITDB_ARGS", "--auth-host=scram-sha-256")
-            .WithResourceMapping(initScript, initScriptPath)
-            .Build();
+        await using var database = new PostgreSqlDatabase();
+        var postgres = database.Container;
         await postgres.StartAsync(cancellationToken);
 
-        var repeatedInitialization = await postgres.ExecAsync(["sh", initScriptPath], cancellationToken);
+        var repeatedInitialization = await postgres.ExecAsync(["sh", PostgreSqlDatabase.InitScriptPath], cancellationToken);
         Assert.Equal(0, repeatedInitialization.ExitCode);
 
-        var connectionString = new NpgsqlConnectionStringBuilder(postgres.GetConnectionString());
-        var settings = new Dictionary<string, string?>
-        {
-            ["Database:Host"] = connectionString.Host,
-            ["Database:Port"] = connectionString.Port.ToString(CultureInfo.InvariantCulture),
-            ["Database:Name"] = connectionString.Database,
-            ["Database:Username"] = "workhaven_app",
-            ["Database:Password"] = appPassword
-        };
-        await using var factory = CreateFactory(settings);
+        var settings = database.Settings;
+        await using var factory = ApiFactory.Create(settings);
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
             AllowAutoRedirect = false
@@ -100,7 +80,7 @@ public sealed class HealthEndpointTests
         {
             ["Database:Password"] = "incorrect-password"
         };
-        await using (var invalidFactory = CreateFactory(invalidCredentials))
+        await using (var invalidFactory = ApiFactory.Create(invalidCredentials))
         using (var invalidClient = invalidFactory.CreateClient())
         {
             await AssertHealthAsync(invalidClient, "/health/ready", HttpStatusCode.ServiceUnavailable, "Unhealthy");
@@ -122,28 +102,6 @@ public sealed class HealthEndpointTests
         }
 
         await AssertHealthAsync(client, "/health/ready", HttpStatusCode.OK, "Healthy");
-    }
-
-    private static WebApplicationFactory<Program> CreateFactory(Dictionary<string, string?>? overrides = null)
-    {
-        var settings = new Dictionary<string, string?>
-        {
-            ["Database:Host"] = "127.0.0.1",
-            ["Database:Port"] = "1",
-            ["Database:Name"] = "workhaven",
-            ["Database:Username"] = "workhaven_app",
-            ["Database:Password"] = "unused"
-        };
-        if (overrides is not null)
-        {
-            foreach (var (key, value) in overrides)
-            {
-                settings[key] = value;
-            }
-        }
-
-        return new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-            builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(settings)));
     }
 
     private static async Task AssertHealthAsync(HttpClient client, string path, HttpStatusCode statusCode, string body)

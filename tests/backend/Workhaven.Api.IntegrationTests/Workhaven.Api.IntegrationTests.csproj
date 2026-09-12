@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <Content Include="../../../development/postgres/init-app-user.sh" Link="Postgres/init-app-user.sh" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../../development/postgres/migrate.sh" Link="Postgres/migrate.sh" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

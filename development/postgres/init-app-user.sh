@@ -12,5 +12,12 @@ WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'workhaven_app')
 ALTER ROLE workhaven_app WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD :'app_password';
 SELECT format('GRANT CONNECT ON DATABASE %I TO workhaven_app', current_database())
 \gexec
+CREATE SCHEMA IF NOT EXISTS identity;
+GRANT USAGE ON SCHEMA identity TO workhaven_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA identity TO workhaven_app;
+GRANT USAGE ON ALL SEQUENCES IN SCHEMA identity TO workhaven_app;
+-- Only objects created by this deployment role inherit these runtime permissions.
+ALTER DEFAULT PRIVILEGES IN SCHEMA identity GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO workhaven_app;
+ALTER DEFAULT PRIVILEGES IN SCHEMA identity GRANT USAGE ON SEQUENCES TO workhaven_app;
 COMMIT;
 SQL
