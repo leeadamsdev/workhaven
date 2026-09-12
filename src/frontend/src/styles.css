@@ -2,7 +2,7 @@
 
 @theme {
   --font-sans: system-ui, sans-serif;
-  --color-background: #f8f9f6;
-  --color-foreground: #253c34;
-  --color-muted-foreground: #53645c;
+  --color-background: #f7f8fa;
+  --color-foreground: #111827;
+  --color-muted-foreground: #5b6878;
 }
