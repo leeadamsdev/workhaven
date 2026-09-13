@@ -7,6 +7,7 @@ using Npgsql;
 using Workhaven.Api.Features.Identity;
 using Workhaven.Api.Features.Identity.EmailConfirmation;
 using Workhaven.Api.Features.Identity.Login;
+using Workhaven.Api.Features.Identity.Logout;
 using Workhaven.Api.Features.Identity.Registration;
 using Workhaven.Api.Infrastructure.Database;
 
@@ -82,6 +83,7 @@ app.MapRegistration();
 app.MapEmailConfirmation();
 app.MapCsrfToken();
 app.MapLogin();
+app.MapLogout();
 
 app.MapHealthChecks("/health", new HealthCheckOptions
 {

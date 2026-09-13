@@ -1,22 +1,17 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Security.Claims;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
+using static Workhaven.Api.IntegrationTests.AuthenticationTestSupport;
 
 namespace Workhaven.Api.IntegrationTests;
 
 public sealed class LoginEndpointTests(IdentityDatabaseFixture fixture) : IClassFixture<IdentityDatabaseFixture>
 {
-    private const string Password = " a long test passphrase ";
     private readonly IDataProtectionProvider _protection = new EphemeralDataProtectionProvider();
 
     [Theory]
@@ -269,42 +264,13 @@ public sealed class LoginEndpointTests(IdentityDatabaseFixture fixture) : IClass
     }
 
     private WebApplicationFactory<Program> CreateFactory(string environment = "Development") =>
-        ApiFactory.Create(fixture.Database.Settings, environment).WithWebHostBuilder(builder => builder.ConfigureServices(services =>
-        {
-            services.AddSingleton(_protection);
-            services.AddTransient<IStartupFilter, AuthenticationProbe>();
-        }));
-
-    private static HttpClient Client(WebApplicationFactory<Program> factory, string origin = "http://localhost") =>
-        factory.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new Uri(origin), AllowAutoRedirect = false });
-
-    private static async Task<IdentityUser> CreateUserAsync(WebApplicationFactory<Program> factory, bool confirmed = true)
-    {
-        await using var scope = factory.Services.CreateAsyncScope();
-        var users = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
-        var email = $"login-{Guid.NewGuid():N}@example.test";
-        var user = new IdentityUser(email) { Email = email, EmailConfirmed = confirmed };
-        Assert.True((await users.CreateAsync(user, Password)).Succeeded);
-        return user;
-    }
+        AuthenticationTestSupport.CreateFactory(fixture.Database.Settings, _protection, environment);
 
     private static async Task<IdentityUser> ReadUserAsync(WebApplicationFactory<Program> factory, string id)
     {
         await using var scope = factory.Services.CreateAsyncScope();
         return Assert.IsType<IdentityUser>(await scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>().FindByIdAsync(id));
     }
-
-    private static async Task<string> SetCsrfAsync(HttpClient client)
-    {
-        var csrf = await client.GetFromJsonAsync<CsrfResponse>("/api/auth/csrf", TestContext.Current.CancellationToken);
-        Assert.NotNull(csrf);
-        client.DefaultRequestHeaders.Remove("X-CSRF-TOKEN");
-        client.DefaultRequestHeaders.Add("X-CSRF-TOKEN", csrf.RequestToken);
-        return csrf.RequestToken;
-    }
-
-    private static Task<HttpResponseMessage> LoginAsync(HttpClient client, string? email, string? password) =>
-        client.PostAsJsonAsync("/api/auth/login", new { email, password }, TestContext.Current.CancellationToken);
 
     private static void AssertCookie(string cookie, string name, string sameSite, bool secure)
     {
@@ -316,7 +282,6 @@ public sealed class LoginEndpointTests(IdentityDatabaseFixture fixture) : IClass
         Assert.Equal(secure, cookie.Contains("; secure", StringComparison.OrdinalIgnoreCase));
     }
 
-    private sealed record CsrfResponse(string RequestToken);
     private sealed record ProblemResponse(string Title, string Detail);
 
     private sealed class TestClock : TimeProvider
@@ -325,29 +290,4 @@ public sealed class LoginEndpointTests(IdentityDatabaseFixture fixture) : IClass
         public override DateTimeOffset GetUtcNow() => UtcNow;
     }
 
-    private sealed class AuthenticationProbe : IStartupFilter
-    {
-        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
-        {
-            app.Use(async (context, continuation) =>
-            {
-                if (context.Request.Path != "/test/auth")
-                {
-                    await continuation(context);
-                    return;
-                }
-
-                // Exercise the real cookie handler without adding a test-only production endpoint.
-                var result = await context.AuthenticateAsync(IdentityConstants.ApplicationScheme);
-                if (!result.Succeeded)
-                {
-                    await context.ChallengeAsync(IdentityConstants.ApplicationScheme);
-                    return;
-                }
-
-                await context.Response.WriteAsync(result.Principal.FindFirstValue(ClaimTypes.NameIdentifier)!, context.RequestAborted);
-            });
-            next(app);
-        };
-    }
 }
