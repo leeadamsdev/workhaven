@@ -1,0 +1,7 @@
+# Opt-in live delivery for testing with your Resend account. Normal Compose uses Mailpit.
+services:
+  api:
+    environment:
+      Email__Provider: Resend
+      Resend__ApiKey: ${RESEND_API_KEY:?Set RESEND_API_KEY in .env}
+      Resend__From: ${RESEND_FROM:-Workhaven <onboarding@resend.dev>}

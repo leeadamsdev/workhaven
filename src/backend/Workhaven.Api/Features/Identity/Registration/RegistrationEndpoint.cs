@@ -12,7 +12,7 @@ internal static class RegistrationEndpoint
     public static RouteHandlerBuilder MapRegistration(this IEndpointRouteBuilder endpoints) =>
         endpoints.MapPost("/api/auth/register", HandleAsync).RequireRateLimiting(IdentityRateLimiting.Registration);
 
-    private static async Task<Results<NoContent, ValidationProblem, ProblemHttpResult>> HandleAsync(
+    private static async Task<Results<NoContent, ValidationProblem>> HandleAsync(
         RegisterRequest request, RegistrationService registration, CancellationToken cancellationToken)
     {
         if (request.Email?.Any(char.IsControl) == true)
@@ -42,12 +42,6 @@ internal static class RegistrationEndpoint
         if (result.Succeeded)
         {
             return TypedResults.NoContent();
-        }
-
-        if (result.Errors.Any(error => error.Code == "EmailDeliveryUnavailable"))
-        {
-            return TypedResults.Problem(statusCode: StatusCodes.Status503ServiceUnavailable,
-                title: "Registration is unavailable", detail: "Please try again later.");
         }
 
         return TypedResults.ValidationProblem(result.Errors

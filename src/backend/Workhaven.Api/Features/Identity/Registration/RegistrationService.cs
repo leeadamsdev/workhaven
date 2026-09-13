@@ -2,20 +2,14 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Workhaven.Api.Features.Identity.EmailConfirmation;
-using Workhaven.Api.Infrastructure.Email;
 
 namespace Workhaven.Api.Features.Identity.Registration;
 
 internal sealed class RegistrationService(
-    UserManager<IdentityUser> users, WorkhavenIdentityDbContext database, IEmailDelivery? delivery = null)
+    UserManager<IdentityUser> users, WorkhavenIdentityDbContext database)
 {
     public async Task<IdentityResult> RegisterAsync(string email, string password, CancellationToken cancellationToken)
     {
-        if (delivery is null)
-        {
-            return IdentityResult.Failed(new IdentityError { Code = "EmailDeliveryUnavailable" });
-        }
-
         var user = new IdentityUser(email) { Email = email };
         var result = await CreateAccountAsync(user, password, cancellationToken);
         if (result.Succeeded || !result.Errors.All(error => error.Code is "DuplicateEmail" or "DuplicateUserName"))
@@ -31,7 +25,11 @@ internal sealed class RegistrationService(
             await database.Database.ExecuteSqlInterpolatedAsync($"""
                 INSERT INTO identity."PendingConfirmationEmails" ("UserId", "NextAttemptAt", "Attempts")
                 VALUES ({existing.Id}, {DateTimeOffset.UtcNow}, 0)
-                ON CONFLICT ("UserId") DO NOTHING
+                ON CONFLICT ("UserId") DO UPDATE
+                SET "NextAttemptAt" = EXCLUDED."NextAttemptAt", "Attempts" = 0,
+                    "DeliveryId" = NULL, "PreparedAt" = NULL, "ProtectedMessage" = NULL,
+                    "FailedAt" = NULL, "FailureCode" = NULL
+                WHERE "PendingConfirmationEmails"."FailedAt" IS NOT NULL
                 """, cancellationToken);
         }
 

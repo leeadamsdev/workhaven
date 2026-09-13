@@ -18,7 +18,7 @@ internal sealed class WorkhavenIdentityDbContext(DbContextOptions<WorkhavenIdent
         builder.Entity<PendingConfirmationEmail>(email =>
         {
             email.HasKey(pending => pending.UserId);
-            email.HasIndex(pending => pending.NextAttemptAt);
+            email.HasIndex(pending => pending.NextAttemptAt).HasFilter("\"FailedAt\" IS NULL");
             email.HasOne<IdentityUser>().WithMany().HasForeignKey(pending => pending.UserId).OnDelete(DeleteBehavior.Cascade);
         });
     }

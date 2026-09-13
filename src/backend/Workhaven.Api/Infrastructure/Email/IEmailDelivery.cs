@@ -2,5 +2,8 @@ namespace Workhaven.Api.Infrastructure.Email;
 
 internal interface IEmailDelivery
 {
-    Task SendAsync(string recipient, string subject, string text, CancellationToken cancellationToken);
+    EmailProvider Provider { get; }
+    string From { get; }
+
+    Task<EmailDeliveryResult> SendAsync(EmailMessage message, Guid deliveryId, CancellationToken cancellationToken);
 }

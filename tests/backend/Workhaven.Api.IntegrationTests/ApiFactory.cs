@@ -12,7 +12,7 @@ namespace Workhaven.Api.IntegrationTests;
 internal static class ApiFactory
 {
     public static WebApplicationFactory<Program> Create(
-        Dictionary<string, string?>? overrides = null, string environment = "Development")
+        Dictionary<string, string?>? overrides = null, string environment = "Development", bool useTestEmailDelivery = true)
     {
         var settings = new Dictionary<string, string?>
         {
@@ -20,7 +20,11 @@ internal static class ApiFactory
             ["Database:Port"] = "1",
             ["Database:Name"] = "workhaven",
             ["Database:Username"] = "workhaven_app",
-            ["Database:Password"] = "unused"
+            ["Database:Password"] = "unused",
+            ["Resend:ApiKey"] = "test-only-not-a-real-key",
+            ["Resend:From"] = "Workhaven <no-reply@example.test>",
+            ["ConfirmationEmail:PageUrl"] = environment == "Development"
+                ? "http://localhost:5173/confirm-email" : "https://example.test/confirm-email"
         };
         if (overrides is not null)
         {
@@ -32,6 +36,8 @@ internal static class ApiFactory
 
         return new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
             builder.UseEnvironment(environment)
+                .UseSetting("Email:Provider", settings.GetValueOrDefault("Email:Provider") ??
+                    (environment == "Development" ? "Mailpit" : "Resend"))
                 .ConfigureServices(services =>
                 {
                     services.AddDataProtection().UseEphemeralDataProtectionProvider();
@@ -41,15 +47,21 @@ internal static class ApiFactory
                         services.Remove(worker);
                     }
 
-                    services.RemoveAll<IEmailDelivery>();
-                    services.AddSingleton<IEmailDelivery, TestEmailDelivery>();
+                    if (useTestEmailDelivery)
+                    {
+                        services.RemoveAll<IEmailDelivery>();
+                        services.AddSingleton<IEmailDelivery, TestEmailDelivery>();
+                    }
                 })
                 .ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(settings)));
     }
 
     private sealed class TestEmailDelivery : IEmailDelivery
     {
-        public Task SendAsync(string recipient, string subject, string text, CancellationToken cancellationToken) =>
+        public EmailProvider Provider => EmailProvider.Mailpit;
+        public string From => "Workhaven <no-reply@example.test>";
+
+        public Task<EmailDeliveryResult> SendAsync(EmailMessage message, Guid deliveryId, CancellationToken cancellationToken) =>
             throw new InvalidOperationException("This test must explicitly configure email delivery before sending.");
     }
 }

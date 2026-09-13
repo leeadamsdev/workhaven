@@ -2,6 +2,7 @@ using System.Data.Common;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -20,6 +21,7 @@ public sealed class ConfirmationEmailDeliveryTests(EmailDeliveryFixture fixture)
     : IClassFixture<EmailDeliveryFixture>, IAsyncLifetime
 {
     private const string Password = "a long test passphrase";
+    private readonly IDataProtectionProvider _protection = new EphemeralDataProtectionProvider();
 
     public async ValueTask InitializeAsync()
     {
@@ -243,24 +245,18 @@ public sealed class ConfirmationEmailDeliveryTests(EmailDeliveryFixture fixture)
     }
 
     [Fact]
-    public async Task ProductionDoesNotUseMailpitOrAcceptRegistrationWithoutDelivery()
+    public async Task MissingProductionCredentialsFailAtStartup()
     {
-        await using var factory = ApiFactory.Create(fixture.Settings, "Production").WithWebHostBuilder(builder =>
-            builder.ConfigureServices(services => services.RemoveAll<IEmailDelivery>()));
-        using var client = factory.CreateClient();
-        using var response = await client.PostAsJsonAsync("/api/auth/register",
-            new { email = "production@example.test", password = Password }, TestContext.Current.CancellationToken);
-        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
-        await using var scope = factory.Services.CreateAsyncScope();
-        Assert.False(await scope.ServiceProvider.GetRequiredService<WorkhavenIdentityDbContext>()
-            .Users.AnyAsync(TestContext.Current.CancellationToken));
-        using var health = await client.GetAsync("/health", TestContext.Current.CancellationToken);
-        Assert.Equal(HttpStatusCode.OK, health.StatusCode);
+        var settings = fixture.Settings;
+        settings["Resend:ApiKey"] = string.Empty;
+        await using var factory = ApiFactory.Create(settings, "Production");
+        Assert.Throws<OptionsValidationException>(() => factory.CreateClient());
     }
 
     private WebApplicationFactory<Program> CreateFactory(Dictionary<string, string?>? settings = null) =>
         ApiFactory.Create(settings ?? fixture.Settings).WithWebHostBuilder(builder => builder.ConfigureServices(services =>
         {
+            services.AddSingleton(_protection);
             services.RemoveAll<IEmailDelivery>();
             services.AddHttpClient<IEmailDelivery, MailpitEmailDelivery>(client => client.Timeout = TimeSpan.FromSeconds(2));
         }));
@@ -294,7 +290,11 @@ public sealed class ConfirmationEmailDeliveryTests(EmailDeliveryFixture fixture)
         Assert.Equal("Confirm your Workhaven email", message.RootElement.GetProperty("Subject").GetString());
         var text = message.RootElement.GetProperty("Text").GetString();
         Assert.NotNull(text);
-        return new Uri(text.Split('\n').Single(line => line.StartsWith("http", StringComparison.Ordinal)).Trim());
+        var link = text.Split('\n').Single(line => line.StartsWith("http", StringComparison.Ordinal)).Trim();
+        var html = message.RootElement.GetProperty("HTML").GetString();
+        Assert.NotNull(html);
+        Assert.Contains($"href=\"{System.Text.Encodings.Web.HtmlEncoder.Default.Encode(link)}\"", html, StringComparison.Ordinal);
+        return new Uri(link);
     }
 
     private sealed class RejectingHandler : HttpMessageHandler
@@ -319,15 +319,18 @@ public sealed class ConfirmationEmailDeliveryTests(EmailDeliveryFixture fixture)
 
     private sealed class BlockingDelivery : IEmailDelivery
     {
+        public EmailProvider Provider => EmailProvider.Mailpit;
+        public string From => "Workhaven <no-reply@example.test>";
         public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public int Calls { get; private set; }
 
-        public async Task SendAsync(string recipient, string subject, string text, CancellationToken cancellationToken)
+        public async Task<EmailDeliveryResult> SendAsync(EmailMessage message, Guid deliveryId, CancellationToken cancellationToken)
         {
             Calls++;
             Started.TrySetResult();
             await Release.Task.WaitAsync(cancellationToken);
+            return new(EmailDeliveryStatus.Accepted);
         }
     }
 }
