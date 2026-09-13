@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Workhaven.Api.Features.Identity.CurrentUser;
 using Xunit;
 using static Workhaven.Api.IntegrationTests.AuthenticationTestSupport;
 
@@ -39,9 +40,10 @@ public sealed class LoginEndpointTests(IdentityDatabaseFixture fixture) : IClass
         AssertCookie(cookie, authName, "lax", secure);
         Assert.DoesNotContain("expires=", cookie, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("max-age=", cookie, StringComparison.OrdinalIgnoreCase);
-        using var authenticated = await client.GetAsync("/test/auth", TestContext.Current.CancellationToken);
+        using var authenticated = await client.GetAsync("/api/auth/me", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, authenticated.StatusCode);
-        Assert.Equal(user.Id, await authenticated.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(new CurrentUserResponse(user.Id, user.Email),
+            await authenticated.Content.ReadFromJsonAsync<CurrentUserResponse>(TestContext.Current.CancellationToken));
 
         // Tokens issued before login must be refreshed after the browser's identity changes.
         using var staleCsrf = await LoginAsync(client, user.Email, Password);
@@ -77,7 +79,7 @@ public sealed class LoginEndpointTests(IdentityDatabaseFixture fixture) : IClass
         var problem = await response.Content.ReadFromJsonAsync<ProblemResponse>(TestContext.Current.CancellationToken);
         Assert.Equal(new ProblemResponse("Sign-in failed", "Unable to sign in with these credentials."), problem);
         Assert.False(response.Headers.Contains("Set-Cookie"));
-        using var protectedResponse = await client.GetAsync("/test/auth", TestContext.Current.CancellationToken);
+        using var protectedResponse = await client.GetAsync("/api/auth/me", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Unauthorized, protectedResponse.StatusCode);
         Assert.Null(protectedResponse.Headers.Location);
     }
@@ -229,7 +231,7 @@ public sealed class LoginEndpointTests(IdentityDatabaseFixture fixture) : IClass
             services.Configure<SecurityStampValidatorOptions>(options => options.ValidationInterval = TimeSpan.Zero)));
         using var authenticated = Client(restarted);
         authenticated.DefaultRequestHeaders.Add("Cookie", cookie);
-        using var before = await authenticated.GetAsync("/test/auth", TestContext.Current.CancellationToken);
+        using var before = await authenticated.GetAsync("/api/auth/me", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, before.StatusCode);
         await using (var scope = restarted.Services.CreateAsyncScope())
         {
@@ -239,7 +241,7 @@ public sealed class LoginEndpointTests(IdentityDatabaseFixture fixture) : IClass
             Assert.True((await users.UpdateSecurityStampAsync(stored)).Succeeded);
         }
 
-        using var after = await authenticated.GetAsync("/test/auth", TestContext.Current.CancellationToken);
+        using var after = await authenticated.GetAsync("/api/auth/me", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Unauthorized, after.StatusCode);
     }
 
@@ -256,10 +258,10 @@ public sealed class LoginEndpointTests(IdentityDatabaseFixture fixture) : IClass
         var cookie = Assert.Single(response.Headers.GetValues("Set-Cookie")).Split(';')[0];
         using var tampered = Client(factory);
         tampered.DefaultRequestHeaders.Add("Cookie", cookie + "tampered");
-        using var rejected = await tampered.GetAsync("/test/auth", TestContext.Current.CancellationToken);
+        using var rejected = await tampered.GetAsync("/api/auth/me", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Unauthorized, rejected.StatusCode);
         clock.UtcNow = clock.UtcNow.AddHours(9);
-        using var expired = await client.GetAsync("/test/auth", TestContext.Current.CancellationToken);
+        using var expired = await client.GetAsync("/api/auth/me", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Unauthorized, expired.StatusCode);
     }
 

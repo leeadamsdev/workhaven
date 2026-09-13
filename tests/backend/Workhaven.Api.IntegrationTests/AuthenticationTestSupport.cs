@@ -1,10 +1,5 @@
 using System.Net.Http.Json;
-using System.Security.Claims;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,10 +14,7 @@ internal static class AuthenticationTestSupport
     public static WebApplicationFactory<Program> CreateFactory(
         Dictionary<string, string?> settings, IDataProtectionProvider protection, string environment = "Development") =>
         ApiFactory.Create(settings, environment).WithWebHostBuilder(builder => builder.ConfigureServices(services =>
-        {
-            services.AddSingleton(protection);
-            services.AddTransient<IStartupFilter, AuthenticationProbe>();
-        }));
+            services.AddSingleton(protection)));
 
     public static HttpClient Client(WebApplicationFactory<Program> factory, string origin = "http://localhost") =>
         factory.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new Uri(origin), AllowAutoRedirect = false });
@@ -51,29 +43,4 @@ internal static class AuthenticationTestSupport
 
     internal sealed record CsrfResponse(string RequestToken);
 
-    private sealed class AuthenticationProbe : IStartupFilter
-    {
-        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
-        {
-            app.Use(async (context, continuation) =>
-            {
-                if (context.Request.Path != "/test/auth")
-                {
-                    await continuation(context);
-                    return;
-                }
-
-                // Exercise the real cookie handler without adding a test-only production endpoint.
-                var result = await context.AuthenticateAsync(IdentityConstants.ApplicationScheme);
-                if (!result.Succeeded)
-                {
-                    await context.ChallengeAsync(IdentityConstants.ApplicationScheme);
-                    return;
-                }
-
-                await context.Response.WriteAsync(result.Principal.FindFirstValue(ClaimTypes.NameIdentifier)!, context.RequestAborted);
-            });
-            next(app);
-        };
-    }
 }

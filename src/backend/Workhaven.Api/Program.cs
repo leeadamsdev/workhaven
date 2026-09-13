@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Npgsql;
 using Workhaven.Api.Features.Identity;
+using Workhaven.Api.Features.Identity.CurrentUser;
 using Workhaven.Api.Features.Identity.EmailConfirmation;
 using Workhaven.Api.Features.Identity.Login;
 using Workhaven.Api.Features.Identity.Logout;
@@ -58,6 +59,7 @@ builder.Services.AddIdentityCore<IdentityUser>(options =>
 
 builder.Services.AddIdentityRateLimiting();
 builder.Services.AddIdentityAuthentication(builder.Environment);
+builder.Services.AddAuthorization();
 builder.Services.AddScoped<LoginService>();
 builder.Services.AddRegistration();
 builder.Services.AddEmailConfirmation();
@@ -77,6 +79,7 @@ app.UseExceptionHandler(new ExceptionHandlerOptions
 });
 app.UseStatusCodePages();
 app.UseAuthentication();
+app.UseAuthorization();
 app.UseRateLimiter();
 
 app.MapRegistration();
@@ -84,6 +87,7 @@ app.MapEmailConfirmation();
 app.MapCsrfToken();
 app.MapLogin();
 app.MapLogout();
+app.MapCurrentUser();
 
 app.MapHealthChecks("/health", new HealthCheckOptions
 {

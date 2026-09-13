@@ -147,8 +147,9 @@ public sealed class LogoutEndpointTests(IdentityDatabaseFixture fixture) : IClas
 
     private static async Task AssertAuthenticationAsync(HttpClient client, HttpStatusCode expected)
     {
-        using var response = await client.GetAsync("/test/auth", TestContext.Current.CancellationToken);
+        using var response = await client.GetAsync("/api/auth/me", TestContext.Current.CancellationToken);
         Assert.Equal(expected, response.StatusCode);
+        Assert.True(response.Headers.CacheControl?.NoStore);
         Assert.Null(response.Headers.Location);
     }
 }

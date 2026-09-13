@@ -21,6 +21,7 @@ internal static class IdentityAuthentication
                 options.Events.OnValidatePrincipal = SecurityStampValidator.ValidatePrincipalAsync;
                 options.Events.OnRedirectToLogin = context =>
                 {
+                    context.Response.Headers.CacheControl = "no-store";
                     context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                     return Task.CompletedTask;
                 };
