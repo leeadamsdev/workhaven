@@ -34,6 +34,11 @@ RUN apt-get update \
 WORKDIR /app
 COPY --from=build /app/publish .
 
+# The local Compose volume retains token-protection keys across container replacement.
+RUN mkdir -p /home/app/.aspnet/DataProtection-Keys \
+    && chown "$APP_UID:$APP_UID" /home/app/.aspnet/DataProtection-Keys \
+    && chmod 700 /home/app/.aspnet/DataProtection-Keys
+
 USER $APP_UID
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "Workhaven.Api.dll"]

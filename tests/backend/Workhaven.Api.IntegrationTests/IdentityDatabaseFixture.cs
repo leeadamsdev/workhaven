@@ -2,7 +2,7 @@ using Xunit;
 
 namespace Workhaven.Api.IntegrationTests;
 
-public sealed class RegistrationDatabaseFixture : IAsyncLifetime
+public sealed class IdentityDatabaseFixture : IAsyncLifetime
 {
     internal PostgreSqlDatabase Database { get; } = new();
 

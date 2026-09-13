@@ -1,6 +1,11 @@
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Workhaven.Api.Features.Identity.EmailConfirmation;
+using Workhaven.Api.Infrastructure.Email;
 
 namespace Workhaven.Api.IntegrationTests;
 
@@ -27,6 +32,24 @@ internal static class ApiFactory
 
         return new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
             builder.UseEnvironment(environment)
+                .ConfigureServices(services =>
+                {
+                    services.AddDataProtection().UseEphemeralDataProtectionProvider();
+                    var worker = services.SingleOrDefault(descriptor => descriptor.ImplementationType == typeof(ConfirmationEmailWorker));
+                    if (worker is not null)
+                    {
+                        services.Remove(worker);
+                    }
+
+                    services.RemoveAll<IEmailDelivery>();
+                    services.AddSingleton<IEmailDelivery, TestEmailDelivery>();
+                })
                 .ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(settings)));
+    }
+
+    private sealed class TestEmailDelivery : IEmailDelivery
+    {
+        public Task SendAsync(string recipient, string subject, string text, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("This test must explicitly configure email delivery before sending.");
     }
 }

@@ -14,8 +14,8 @@ using Xunit;
 
 namespace Workhaven.Api.IntegrationTests;
 
-public sealed class RegistrationEndpointTests(RegistrationDatabaseFixture fixture)
-    : IClassFixture<RegistrationDatabaseFixture>
+public sealed class RegistrationEndpointTests(IdentityDatabaseFixture fixture)
+    : IClassFixture<IdentityDatabaseFixture>
 {
     private const string Endpoint = "/api/auth/register";
     private const string Password = "a long test passphrase";

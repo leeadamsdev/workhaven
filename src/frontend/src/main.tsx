@@ -4,6 +4,7 @@ import { App } from './App';
 import './styles.css';
 
 const root = document.getElementById('root');
+const queryClient = new QueryClient();
 
 if (root === null) {
   throw new Error('The application root element is missing.');
@@ -11,6 +12,9 @@ if (root === null) {
 
 createRoot(root).render(
   <StrictMode>
-    <App />
+    <QueryClientProvider client={queryClient}>
+      <App />
+    </QueryClientProvider>
   </StrictMode>,
 );
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';

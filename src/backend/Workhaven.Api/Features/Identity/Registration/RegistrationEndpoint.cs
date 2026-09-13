@@ -1,48 +1,19 @@
 using System.ComponentModel.DataAnnotations;
-using System.Globalization;
 using System.Text.Json;
-using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace Workhaven.Api.Features.Identity.Registration;
 
 internal static class RegistrationEndpoint
 {
-    private const string RateLimitPolicy = "registration";
-
-    public static IServiceCollection AddRegistration(this IServiceCollection services)
-    {
+    public static IServiceCollection AddRegistration(this IServiceCollection services) =>
         services.AddScoped<RegistrationService>();
-        services.AddRateLimiter(options =>
-        {
-            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-            options.OnRejected = (context, _) =>
-            {
-                if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
-                {
-                    context.HttpContext.Response.Headers.RetryAfter =
-                        Math.Ceiling(retryAfter.TotalSeconds).ToString(CultureInfo.InvariantCulture);
-                }
-
-                return ValueTask.CompletedTask;
-            };
-            options.AddPolicy(RateLimitPolicy, context => RateLimitPartition.GetFixedWindowLimiter(
-                context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-                _ => new FixedWindowRateLimiterOptions
-                {
-                    PermitLimit = 5,
-                    Window = TimeSpan.FromMinutes(1),
-                    QueueLimit = 0
-                }));
-        });
-        return services;
-    }
 
     public static RouteHandlerBuilder MapRegistration(this IEndpointRouteBuilder endpoints) =>
-        endpoints.MapPost("/api/auth/register", HandleAsync).RequireRateLimiting(RateLimitPolicy);
+        endpoints.MapPost("/api/auth/register", HandleAsync).RequireRateLimiting(IdentityRateLimiting.Registration);
 
-    private static async Task<Results<NoContent, ValidationProblem>> HandleAsync(
-        RegisterRequest request, RegistrationService registration)
+    private static async Task<Results<NoContent, ValidationProblem, ProblemHttpResult>> HandleAsync(
+        RegisterRequest request, RegistrationService registration, CancellationToken cancellationToken)
     {
         if (request.Email?.Any(char.IsControl) == true)
         {
@@ -67,10 +38,16 @@ internal static class RegistrationEndpoint
             return TypedResults.ValidationProblem(errors);
         }
 
-        var result = await registration.RegisterAsync(request.Email!, request.Password!);
+        var result = await registration.RegisterAsync(request.Email!, request.Password!, cancellationToken);
         if (result.Succeeded)
         {
             return TypedResults.NoContent();
+        }
+
+        if (result.Errors.Any(error => error.Code == "EmailDeliveryUnavailable"))
+        {
+            return TypedResults.Problem(statusCode: StatusCodes.Status503ServiceUnavailable,
+                title: "Registration is unavailable", detail: "Please try again later.");
         }
 
         return TypedResults.ValidationProblem(result.Errors

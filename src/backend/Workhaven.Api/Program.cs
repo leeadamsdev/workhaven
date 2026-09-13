@@ -1,9 +1,11 @@
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Npgsql;
 using Workhaven.Api.Features.Identity;
+using Workhaven.Api.Features.Identity.EmailConfirmation;
 using Workhaven.Api.Features.Identity.Registration;
 using Workhaven.Api.Infrastructure.Database;
 
@@ -34,6 +36,7 @@ builder.Services.AddSingleton(serviceProvider =>
 builder.Services.AddDbContext<WorkhavenIdentityDbContext>((services, options) =>
     options.UseNpgsql(services.GetRequiredService<NpgsqlDataSource>()));
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddDataProtection().SetApplicationName("Workhaven");
 builder.Services.AddIdentityCore<IdentityUser>(options =>
     {
         options.User.RequireUniqueEmail = true;
@@ -47,9 +50,13 @@ builder.Services.AddIdentityCore<IdentityUser>(options =>
         options.Password.RequireNonAlphanumeric = false;
     })
     .AddUserManager<AspNetUserManager<IdentityUser>>()
+    .AddTokenProvider<DataProtectorTokenProvider<IdentityUser>>(TokenOptions.DefaultProvider)
     .AddEntityFrameworkStores<WorkhavenIdentityDbContext>();
 
+builder.Services.AddIdentityRateLimiting();
 builder.Services.AddRegistration();
+builder.Services.AddEmailConfirmation();
+builder.Services.AddConfirmationEmailDelivery(builder.Configuration, builder.Environment);
 builder.Services.AddProblemDetails();
 
 builder.Services.AddHealthChecks()
@@ -67,6 +74,7 @@ app.UseStatusCodePages();
 app.UseRateLimiter();
 
 app.MapRegistration();
+app.MapEmailConfirmation();
 
 app.MapHealthChecks("/health", new HealthCheckOptions
 {

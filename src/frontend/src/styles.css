@@ -5,4 +5,8 @@
   --color-background: #f7f8fa;
   --color-foreground: #111827;
   --color-muted-foreground: #5b6878;
+  --color-primary: #3156d3;
+  --color-primary-hover: #2747b5;
+  --color-success: #027a48;
+  --color-danger: #b42318;
 }

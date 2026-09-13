@@ -1,4 +1,10 @@
+import { ConfirmEmailPage } from './features/identity/ConfirmEmailPage';
+
 export function App() {
+  if (window.location.pathname === '/confirm-email') {
+    return <ConfirmEmailPage />;
+  }
+
   return (
     <main className="mx-auto max-w-5xl px-[clamp(1.5rem,5vw,4rem)] py-[clamp(3rem,12vh,8rem)]">
       <h1 className="text-[clamp(2.5rem,6vw,4rem)] leading-[1.15] font-semibold tracking-[-0.04em]">
