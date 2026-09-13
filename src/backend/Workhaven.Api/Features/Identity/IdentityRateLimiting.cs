@@ -7,6 +7,7 @@ internal static class IdentityRateLimiting
 {
     public const string Registration = "registration";
     public const string EmailConfirmation = "email-confirmation";
+    public const string Login = "login";
 
     public static IServiceCollection AddIdentityRateLimiting(this IServiceCollection services) =>
         services.AddRateLimiter(options =>
@@ -24,6 +25,7 @@ internal static class IdentityRateLimiting
             };
             options.AddPolicy(Registration, CreatePartition);
             options.AddPolicy(EmailConfirmation, CreatePartition);
+            options.AddPolicy(Login, CreatePartition);
         });
 
     private static RateLimitPartition<string> CreatePartition(HttpContext context) =>

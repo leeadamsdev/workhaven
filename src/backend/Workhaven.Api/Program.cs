@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using Npgsql;
 using Workhaven.Api.Features.Identity;
 using Workhaven.Api.Features.Identity.EmailConfirmation;
+using Workhaven.Api.Features.Identity.Login;
 using Workhaven.Api.Features.Identity.Registration;
 using Workhaven.Api.Infrastructure.Database;
 
@@ -50,10 +51,13 @@ builder.Services.AddIdentityCore<IdentityUser>(options =>
         options.Password.RequireNonAlphanumeric = false;
     })
     .AddUserManager<AspNetUserManager<IdentityUser>>()
+    .AddSignInManager()
     .AddTokenProvider<DataProtectorTokenProvider<IdentityUser>>(TokenOptions.DefaultProvider)
     .AddEntityFrameworkStores<WorkhavenIdentityDbContext>();
 
 builder.Services.AddIdentityRateLimiting();
+builder.Services.AddIdentityAuthentication(builder.Environment);
+builder.Services.AddScoped<LoginService>();
 builder.Services.AddRegistration();
 builder.Services.AddEmailConfirmation();
 builder.Services.AddConfirmationEmailDelivery(builder.Configuration, builder.Environment);
@@ -71,10 +75,13 @@ app.UseExceptionHandler(new ExceptionHandlerOptions
         : StatusCodes.Status500InternalServerError
 });
 app.UseStatusCodePages();
+app.UseAuthentication();
 app.UseRateLimiter();
 
 app.MapRegistration();
 app.MapEmailConfirmation();
+app.MapCsrfToken();
+app.MapLogin();
 
 app.MapHealthChecks("/health", new HealthCheckOptions
 {
