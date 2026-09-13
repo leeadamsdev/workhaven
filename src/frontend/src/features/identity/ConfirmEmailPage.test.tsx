@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { StrictMode } from 'react';
+import { BrowserRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from '../../App';
 
@@ -12,13 +13,28 @@ function renderConfirmation(
   render(
     <StrictMode>
       <QueryClientProvider client={new QueryClient()}>
-        <App />
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
       </QueryClientProvider>
     </StrictMode>,
   );
 }
 
 describe('email confirmation', () => {
+  it('navigates from confirmation to sign-in through the router', async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response(null, { status: 401 }));
+    vi.stubGlobal('fetch', request);
+    const user = userEvent.setup();
+    renderConfirmation('');
+    await user.click(screen.getByRole('link', { name: 'Workhaven' }));
+    await screen.findByRole('button', { name: 'Sign in' });
+    expect(window.location.pathname).toBe('/sign-in');
+    expect(document.title).toBe('Sign in · Workhaven');
+  });
+
   it('waits for an explicit keyboard action, posts the token, and focuses success', async () => {
     const request = vi
       .fn<typeof fetch>()

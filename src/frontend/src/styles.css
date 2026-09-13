@@ -3,10 +3,30 @@
 @theme {
   --font-sans: system-ui, sans-serif;
   --color-background: #f7f8fa;
+  --color-surface: #ffffff;
+  --color-border: #dce1e8;
+  --color-input: #8894a4;
   --color-foreground: #111827;
   --color-muted-foreground: #5b6878;
   --color-primary: #3156d3;
   --color-primary-hover: #2747b5;
+  --color-primary-subtle: #eef2ff;
   --color-success: #027a48;
+  --color-success-subtle: #ecfdf3;
   --color-danger: #b42318;
+  --color-danger-subtle: #fef3f2;
+
+  --animate-sign-in-enter: sign-in-enter 350ms ease-out both;
+  --animate-sign-in-feedback: sign-in-enter 180ms ease-out both;
+
+  @keyframes sign-in-enter {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 }

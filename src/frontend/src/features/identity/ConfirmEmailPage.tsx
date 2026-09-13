@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router';
 import { ApiError, postJson } from '../../api/client';
 
 function readConfirmation() {
@@ -9,11 +10,12 @@ function readConfirmation() {
 
 export function ConfirmEmailPage() {
   const [confirmation, setConfirmation] = useState(readConfirmation);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    window.history.replaceState(null, '', window.location.pathname);
+    void navigate('/confirm-email', { replace: true });
     document.title = 'Confirm your email · Workhaven';
-  }, []);
+  }, [navigate]);
 
   const mutation = useMutation({
     mutationFn: () => postJson('/api/auth/confirm-email', confirmation),
@@ -26,14 +28,14 @@ export function ConfirmEmailPage() {
     function readNewLink() {
       setConfirmation(readConfirmation());
       reset();
-      window.history.replaceState(null, '', window.location.pathname);
+      void navigate('/confirm-email', { replace: true });
     }
 
     window.addEventListener('hashchange', readNewLink);
     return () => {
       window.removeEventListener('hashchange', readNewLink);
     };
-  }, [reset]);
+  }, [reset, navigate]);
 
   const invalidLink =
     !confirmation.userId ||
@@ -47,12 +49,12 @@ export function ConfirmEmailPage() {
 
   return (
     <main className="mx-auto max-w-xl px-6 py-16 sm:py-24">
-      <a
-        href="/"
+      <Link
+        to="/"
         className="rounded text-sm font-semibold text-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
       >
         Workhaven
-      </a>
+      </Link>
       <h1 className="mt-8 text-3xl font-semibold tracking-tight">
         Confirm your email
       </h1>
@@ -98,7 +100,7 @@ export function ConfirmEmailPage() {
           <button
             type="submit"
             aria-disabled={mutation.isPending}
-            className="mt-6 rounded-md bg-primary px-5 py-3 font-semibold text-white hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary aria-disabled:cursor-wait aria-disabled:opacity-70"
+            className="mt-6 cursor-pointer rounded-md bg-primary px-5 py-3 font-semibold text-white hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary aria-disabled:cursor-wait aria-disabled:opacity-70"
           >
             {mutation.isPending
               ? 'Confirming…'
